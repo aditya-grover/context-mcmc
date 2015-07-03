@@ -1,12 +1,17 @@
+"""
+Converts a BIF (Bayesian Interchange Format) File to an MLN (Markov Logic Network) File
 
-# Converts a BIF (Bayesian Interchange Format) File to an MLN (Markov Logic Network) File
+Last updated: July 3, 2015
 
+arg1: path of bif file to be converted
+arg2: path of mln file where the output is to be dumped
+"""
 
 import sys, re, math
 
 def parseBIF():
 
-    # portions of parseBIF taken from https://github.com/eBay/bayesian-belief-networks/blob/master/bayesian/examples/bif/bif_parser.py
+    # portions of parseBIF inspired from https://github.com/eBay/bayesian-belief-networks/blob/master/bayesian/examples/bif/bif_parser.py
 
     # Regex patterns for parsing
     infile = open(sys.argv[1], 'r')
@@ -16,7 +21,7 @@ def parseBIF():
     cpt_pattern_1 = re.compile(r'probability \( (.+) \| (.+) \) \{\s*')
     cpt_pattern_2 = re.compile(r'  \((.+)\) (.+);\s*')
 
-# storage data structures
+    # storage data structures
     variables = {}
     cpt = {}
 
@@ -26,8 +31,8 @@ def parseBIF():
         # End of BIF file
         if not line:
             break
-        # print str(line.startswith('variable'))
 
+        # Variable declarations
         if line.startswith('variable'):
             match = variable_pattern.match(infile.readline())
             if match:
@@ -35,6 +40,8 @@ def parseBIF():
             else:
                 raise Exception('Unrecognised variable declaration:\n' + line)
             infile.readline()
+            
+        # Probability entries
         elif line.startswith('probability'):
 
             match = prior_pattern_1.match(line)
@@ -57,7 +64,6 @@ def parseBIF():
                     cpt_table = []
                     line = infile.readline()
                     while line[0] != '}':                        
-                        # print 'h' + line
                         match = cpt_pattern_2.match(line)
                         if match:
                             parent_values = match.group(1).split(', ')
@@ -82,8 +88,6 @@ def addUnary(variables, MLNobject):
         MLNobject.append(MLNline)
     MLNobject.append('')
     return
-    # outobj.writerow('')
-    # outobj.writerow()
 
 def addCPT(parsedBIF, MLNobject):
     variables = parsedBIF[0]
@@ -105,11 +109,10 @@ def addCPT(parsedBIF, MLNobject):
                     if (prob != '0.0'):
                         MLNline = str(-1*math.log(float(prob))) + ' !' + var.upper() + '(' + var.upper() + value.upper() + ')'
                         for (parent, parent_val) in parent_assignment:
-                            MLNline2 = MLNline + ' V !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
+                            MLNline2 = MLNline + ' v !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
                             MLNobject.append(MLNline2) 
 
     return
-    # outobj.writerow('')
 
 def writeMLN(MLNobject):
     with open(sys.argv[2], 'wb') as outfile:
@@ -117,6 +120,7 @@ def writeMLN(MLNobject):
             outfile.write(line + '\n')
     return
 
+# helper print functions
 def printParsedBIF(parsedBIF):
     variables = parsedBIF[0]
     cpt = parsedBIF[1]
@@ -128,12 +132,11 @@ def printParsedBIF(parsedBIF):
 def printMLN(MLNobject):
     for line in MLNobject:
         print line
+
 def main():
 
     # read BIF file
     parsedBIF = parseBIF()
-
-    printParsedBIF(parsedBIF)
 
     MLNobject = []
 
@@ -143,7 +146,6 @@ def main():
     # add disjunction clauses for CPT entries
     addCPT(parsedBIF, MLNobject)
 
-    printMLN(MLNobject)
     # write MLN file
     writeMLN(MLNobject)
     return
