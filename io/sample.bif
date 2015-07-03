@@ -1,0 +1,50 @@
+network sample {
+}
+variable A {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable B {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable C {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable D {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable E {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable F {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+variable G {
+  type discrete [ 2 ] { TRUE, FALSE };
+}
+probability ( A ) {
+  table 0.4, 0.6; 
+}
+probability ( B | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.206830574789, 0.793169425211;
+}
+probability ( C | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.383651218541, 0.616348781459;
+}
+probability ( D | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.396687713506, 0.603312286494;
+}
+probability ( E | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.336861414485, 0.663138585515;
+}
+probability ( F | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.398558601606, 0.601441398394;
+}
+probability ( G | A ) {
+  (TRUE) 0.7, 0.3;
+  (FALSE) 0.179995532699, 0.820004467301;
+}

@@ -36,7 +36,7 @@ def parseBIF():
         if line.startswith('variable'):
             match = variable_pattern.match(infile.readline())
             if match:
-                variables[line[9:-4]] = match.group(1).split(', ')
+                variables[line[9:-3]] = match.group(1).split(', ')
             else:
                 raise Exception('Unrecognised variable declaration:\n' + line)
             infile.readline()
@@ -101,7 +101,9 @@ def addVarConstraints(variables, MLNobject):
     for var in variables:
         if len(variables[var]) == 2:
             domain_values = variables[var]
-            MLNline = '( ' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') ^ !' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') ) v ( ' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') ^ !' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') )'
+            MLNline = '0 ' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') v !' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ')'
+            MLNobject.append(MLNline)
+            MLNline = '0 ' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') v !' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ')'
             MLNobject.append(MLNline)
     MLNobject.append('')
     return
