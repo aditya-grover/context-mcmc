@@ -36,11 +36,11 @@ def parseBIF():
         if line.startswith('variable'):
             match = variable_pattern.match(infile.readline())
             if match:
-                variables[line[9:-3]] = match.group(1).split(', ')
+                variables[line[9:-4]] = match.group(1).split(', ')
             else:
                 raise Exception('Unrecognised variable declaration:\n' + line)
             infile.readline()
-            
+
         # Probability entries
         elif line.startswith('probability'):
 
@@ -81,15 +81,41 @@ def parseBIF():
     infile.close()
     return (variables, cpt)
 
-def addUnary(variables, MLNobject):
+def addDomain(variables, MLNobject):
+    for var in variables.keys():
+        MLNline = var.lower() + 'Value = {'
+        for domain_val in variables[var]:
+             MLNline = MLNline + var.upper() + domain_val.upper() + ', '
+        MLNline = MLNline[:-2] + '}'
+        MLNobject.append(MLNline)
+    MLNobject.append('')
 
+def addUnaryPred(variables, MLNobject):
     for var in variables:
-        MLNline = var.upper() + '(' + var.lower() + 'Value!)'
+        MLNline = var.upper() + '(' + var.lower() + 'Value)'
         MLNobject.append(MLNline)
     MLNobject.append('')
     return
 
-def addCPT(parsedBIF, MLNobject):
+def addVarConstraints(variables, MLNobject):
+    for var in variables:
+        if len(variables[var]) == 2:
+            domain_values = variables[var]
+            MLNline = '( ' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') ^ !' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') ) v ( ' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') ^ !' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') )'
+            MLNobject.append(MLNline)
+    MLNobject.append('')
+    return
+
+def getBaseMLNline(var, value, prob):
+    if (prob == '0.0'):
+        MLNline = '!' + var.upper() + '(' + var.upper() + value.upper() + ')'
+    elif (prob == '1.0'):
+        MLNline = '0 !' + var.upper() + '(' + var.upper() + value.upper() + ')'
+    else:
+        MLNline = str(-1*math.log(float(prob))) + ' !' + var.upper() + '(' + var.upper() + value.upper() + ')'
+    return MLNline
+
+def addCPTconstraints(parsedBIF, MLNobject):
     variables = parsedBIF[0]
     cpt = parsedBIF[1]
 
@@ -98,19 +124,17 @@ def addCPT(parsedBIF, MLNobject):
             parent_assignments = cpt_entry[0]
             prob_values = cpt_entry[1]
             for (value, prob) in zip(variables[var], prob_values):
-                if (prob != '0.0'):
-                    MLNline = str(-1*math.log(float(prob))) + ' !' + var.upper() + '(' + var.upper() + value.upper() + ')'
-                    MLNobject.append(MLNline)
+                MLNline = getBaseMLNline(var, value, prob)
+                MLNobject.append(MLNline)
         else:
             for entry in cpt_entry:
                 parent_assignment = entry[0]
                 prob_values = entry[1]
                 for (value, prob) in zip(variables[var], prob_values):
-                    if (prob != '0.0'):
-                        MLNline = str(-1*math.log(float(prob))) + ' !' + var.upper() + '(' + var.upper() + value.upper() + ')'
-                        for (parent, parent_val) in parent_assignment:
-                            MLNline2 = MLNline + ' v !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
-                            MLNobject.append(MLNline2) 
+                    MLNline = getBaseMLNline(var, value, prob)
+                    for (parent, parent_val) in parent_assignment:
+                        MLNline = MLNline + ' v !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
+                    MLNobject.append(MLNline) 
 
     return
 
@@ -140,11 +164,17 @@ def main():
 
     MLNobject = []
 
-    # add unary predicates
-    addUnary(parsedBIF[0], MLNobject)
+    # add domains of variables
+    addDomain(parsedBIF[0], MLNobject)
+
+    # add unary predicates for each variable
+    addUnaryPred(parsedBIF[0], MLNobject)
+
+    # Values assumed by variables are mutually exclusive and exhaustive
+    addVarConstraints(parsedBIF[0], MLNobject)
 
     # add disjunction clauses for CPT entries
-    addCPT(parsedBIF, MLNobject)
+    addCPTconstraints(parsedBIF, MLNobject)
 
     # write MLN file
     writeMLN(MLNobject)
