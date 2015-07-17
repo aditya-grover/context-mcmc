@@ -101,9 +101,9 @@ def addVarConstraints(variables, MLNobject):
     for var in variables:
         if len(variables[var]) == 2:
             domain_values = variables[var]
-            MLNline = '0 ' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ') v !' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ')'
+            MLNline = var.upper() + '(' + var.upper() + domain_values[0].upper() + ') v ' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ').'
             MLNobject.append(MLNline)
-            MLNline = '0 ' + var.upper() + '(' + var.upper() + domain_values[1].upper() + ') v !' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ')'
+            MLNline = '!'+var.upper() + '(' + var.upper() + domain_values[1].upper() + ') v !' + var.upper() + '(' + var.upper() + domain_values[0].upper() + ').'
             MLNobject.append(MLNline)
     MLNobject.append('')
     return
