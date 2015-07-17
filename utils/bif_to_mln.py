@@ -127,6 +127,7 @@ def addCPTconstraints(parsedBIF, MLNobject):
             prob_values = cpt_entry[1]
             for (value, prob) in zip(variables[var], prob_values):
                 MLNline = getBaseMLNline(var, value, prob)
+                if (prob == '0.0') MLNline = MLNline + '.'
                 MLNobject.append(MLNline)
         else:
             for entry in cpt_entry:
@@ -136,6 +137,7 @@ def addCPTconstraints(parsedBIF, MLNobject):
                     MLNline = getBaseMLNline(var, value, prob)
                     for (parent, parent_val) in parent_assignment:
                         MLNline = MLNline + ' v !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
+                    if (prob == '0.0') MLNline = MLNline + '.'
                     MLNobject.append(MLNline) 
 
     return
