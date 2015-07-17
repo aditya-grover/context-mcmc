@@ -229,15 +229,16 @@ marginalDistr := function ( V, D, W, s, rs )
 	
 	
 	for c in blockCombinations do
-
+		
 		# construct a new world by unioning the base world and the current subset
 		# of the block variables
-		currWorld := ShallowCopy(s);;		
+		currWorld := ShallowCopy(s);;
+		
 		for j in c do
 
 			AddSet(currWorld, j);;
 		od;;
-
+	
 		# determines whether the current world satisfies the deterministic constraints
 		if isValidAssignment(D, currWorld) = true then
 			# increment the counter i (numerical index for possible configurations)
@@ -503,44 +504,46 @@ Print("Reading the DIMACs Saucy CNF input file...\n");;
 input_saucy := InputTextFile("dimacs.cnf.saucy");;
 contextual_saucy :=OutputTextFile("dimacs_context_temp.cnf.saucy",false);;
 Saucy_String := ReadAll(input_saucy);;
-context := [rec(var_name :="A(AFALSE)",var_value :=true)];;#,rec(var_name :="cancer(P1)", var_value :=false)];;
+context := [rec(var_name :="A(AVAL)",var_value :=false)];;#,rec(var_name :="cancer(P1)", var_value :=false)];;
 #context := [rec(var_name :="friends(P1,P2)",var_value :=true),rec(var_name :="cancer(P1)", var_value :=false)];; #get_context;
 context_vars :=NewDictionary(1,true,true);
 context_vars_list := [];
 for i in [1..Length(context)] do
 	#Print("Here",LookupDictionary(VariableMappings,context[i].var_name));;
 	temp_var :=Int(LookupDictionary(VariableMappings,context[i].var_name));;
-	AddDictionary(context_vars,temp_var,true);;#context[i].var_value);;
-	context_vars_list:=Concatenation(context_vars_list,[temp_var]);;
+	AddDictionary(context_vars,temp_var,context[i].var_value);;#context[i].var_value);;
+	if context[i].var_value = false then
+		context_vars_list:=Concatenation(context_vars_list,[-1*temp_var]);;
+	else
+		context_vars_list:=Concatenation(context_vars_list,[temp_var]);;
+	fi;;
 od;;
 saucy_lines := SplitString(Saucy_String,"\n");;
 AppendTo( contextual_saucy, saucy_lines[1],"\n");;
-original_color := 2;;
-color := 2;;
+original_color := 1;;
+color := 1;;
 clauses :=0;;
+flag := false;;
 for i in [2..Length(saucy_lines)]do
+	flag := false;;
 	curr_clause :=SplitString(saucy_lines[i]," ");;
 	if original_color <> Int(curr_clause[1]) then
+		flag := true;;
 		original_color := original_color + 1;;
 		color := color + 1;;
 	fi;;
 	omit_line :=false;;
 	for j in [2..Length(curr_clause)-1]do
 		l:=Length(curr_clause[j]);;
-		if curr_clause[j][1]='-' then
-			var :=Int(curr_clause[j]{[2..l]});;
-		else
-			var :=Int(curr_clause[j]);;
-		fi;;
-		if LookupDictionary(context_vars, var) <> fail then
+		if Int(curr_clause[j]) in context_vars_list then
 			omit_line := true;;
-			detClauseSet := LookupDictionary(deterministicClauses, var);;
-			if detClauseSet <> fail then
-				if curr_clause{[2..Length(curr_clause)-1]} in detClauseSet then
-					omit_line := false;;
-				fi;;
-			fi;;
-			if omit_line = true then
+			# detClauseSet := LookupDictionary(deterministicClauses, var);;
+			# if detClauseSet <> fail then
+			# 	if curr_clause{[2..Length(curr_clause)-1]} in detClauseSet then
+			# 		omit_line := false;;
+			# 	fi;;
+			# fi;;
+			if flag = true then
 				color := color-1;;
 			fi;;
 			break;;
@@ -681,7 +684,7 @@ while sampleCounter < numSamples do
 
 	# distinguish blocksize = 1 and blocksize > 1 -> more efficient
 	blockSize := Length(b);;
-	Print("blocksize",blockSize,"\n");;
+
 	if blockSize > 1 then
 
 		# get the set of features that contain variables in block b (from the hash table)
@@ -726,18 +729,27 @@ while sampleCounter < numSamples do
 
 	# sample uniformly at random from the orbit of s (= orbital Markov chain)
 	
-	 context_valid :=true;;
-	# for i in [1..Length(context_vars_list)] do
-	# 	if not i in s then
-	# 		context_valid := false;;
-	# 		break;;
-	# 	fi;;
-	# od;;
-	# if context_valid = false then	
-	# 	s := OnSets(s, Next(prplOriginal));;
-	# else
-	# 	s := OnSets(s, Next(prplOriginal));;
-	# fi;;	
+	# Print("s:", s, "\n");
+
+	# TODO: currently assuming context_vars_list contains only one 
+	context_valid := false;;
+	for i in [1..Length(context_vars_list)] do
+		if context_vars_list[i] > 0 then
+			if context_vars_list[i] in s then
+				context_valid := true;;
+			fi;;
+		else 
+			if not context_vars_list[i] in s then
+				context_valid := true;;
+			fi;;
+		fi;;
+	od;;
+
+	if context_valid = false then	
+		s := OnSets(s, Next(prplOriginal));;
+	else
+		s := OnSets(s, Next(prplContext));;
+	fi;;	
 
 	# update the counts of the variables
 	updatem(marginals, s);;
