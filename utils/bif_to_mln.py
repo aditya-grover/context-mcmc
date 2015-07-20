@@ -22,8 +22,8 @@ def parseBIF():
     cpt_pattern_2 = re.compile(r'  \((.+)\) (.+);\s*')
 
     # storage data structures
-    variables = {}
-    cpt = {}
+    variables = {}   # key: r.v. nodes, value: values taken by the r.v. eg: 'A': ['TRUE', 'FALSE']
+    cpt = {}         # Key: r.v. nodes, value: list of tuples. tuple format: ([(parent1_name, parent1_value), ...], [r.v_value1_prob, r.v_value2_prob ...]) 
 
     while True:
         line = infile.readline()
@@ -117,17 +117,18 @@ def getBaseMLNline(var, value, prob):
         MLNline = str(-1*math.log(float(prob))) + ' !' + var.upper() + '(' + var.upper() + value.upper() + ')'
     return MLNline
 
-def addCPTconstraints(parsedBIF, MLNobject):
+def addCPTConstraints(parsedBIF, MLNobject):
     variables = parsedBIF[0]
     cpt = parsedBIF[1]
 
     for var, cpt_entry in cpt.iteritems():
-        if not cpt_entry[0]:
+        if not cpt_entry[0]:  # no parents
             parent_assignments = cpt_entry[0]
             prob_values = cpt_entry[1]
             for (value, prob) in zip(variables[var], prob_values):
                 MLNline = getBaseMLNline(var, value, prob)
-                if (prob == '0.0') MLNline = MLNline + '.'
+                if (prob == '0.0'):
+                    MLNline = MLNline + '.'
                 MLNobject.append(MLNline)
         else:
             for entry in cpt_entry:
@@ -137,7 +138,66 @@ def addCPTconstraints(parsedBIF, MLNobject):
                     MLNline = getBaseMLNline(var, value, prob)
                     for (parent, parent_val) in parent_assignment:
                         MLNline = MLNline + ' v !' + parent.upper() + '(' + parent.upper() + parent_val.upper() + ')'
-                    if (prob == '0.0') MLNline = MLNline + '.'
+                    if (prob == '0.0'):
+                        MLNline = MLNline + '.'
+                    MLNobject.append(MLNline) 
+    return
+
+def addDomainBinary(variables, MLNobject):
+    for var in variables.keys():
+        MLNline = var.lower() + 'Value = {' + var.upper() + '_VAL}' 
+        MLNobject.append(MLNline)
+    MLNobject.append('')
+
+def getVariableState(var, value):
+    if value[-4:] == 'TRUE':
+        var_print = '!' + var.upper()
+    elif value[-5:] == 'FALSE':
+        var_print = var.upper()
+    else:
+        raise Exception('Binary variable value names do not have true or false')    
+    return var_print
+
+def getBaseMLNlineBinary(var, value, prob):
+
+    var_print = getVariableState(var, value)
+
+    if (prob == '0.0'):
+        MLNline = var_print + '(' + var.upper() + '_VAL)'
+    elif (prob == '1.0'):
+        MLNline = '0 ' + var_print + '(' + var.upper() + '_VAL)'
+    else:
+        MLNline = str(-1*math.log(float(prob))) + ' ' + var_print + '(' + var.upper() + '_VAL)'
+
+    return MLNline
+
+def addCPTConstraintsBinary(parsedBIF, MLNobject):
+    variables = parsedBIF[0]
+    cpt = parsedBIF[1]
+
+    for var, cpt_entry in cpt.iteritems():
+        if len(variables[var]) != 2:
+            raise Exception('Non-binary variables\n')
+            
+        if not cpt_entry[0]:  # no parents
+            parent_assignments = cpt_entry[0]
+            prob_values = cpt_entry[1]
+            for (value, prob) in zip(variables[var], prob_values):
+                MLNline = getBaseMLNlineBinary(var, value, prob)
+                if (prob == '0.0'):
+                    MLNline = MLNline + '.'
+                MLNobject.append(MLNline)
+        else:
+            for entry in cpt_entry:
+                parent_assignment = entry[0]
+                prob_values = entry[1]
+                for (value, prob) in zip(variables[var], prob_values):
+                    MLNline = getBaseMLNlineBinary(var, value, prob)
+                    for (parent, parent_val) in parent_assignment:
+                        parent_var_print = getVariableState(parent, parent_val)
+                        MLNline = MLNline + ' v ' + parent_var_print + '(' + parent.upper() + '_VAL)'
+                    if (prob == '0.0'):
+                        MLNline = MLNline + '.'
                     MLNobject.append(MLNline) 
 
     return
@@ -154,6 +214,7 @@ def printParsedBIF(parsedBIF):
     cpt = parsedBIF[1]
 
     print variables
+    print "\n\n"
     print cpt
     return
 
@@ -169,6 +230,17 @@ def main():
     MLNobject = []
 
     # add domains of variables
+    addDomainBinary(parsedBIF[0], MLNobject)
+
+    # add unary predicates for each variable
+    addUnaryPred(parsedBIF[0], MLNobject)
+
+    # add disjunction clauses for CPT entries
+    addCPTConstraintsBinary(parsedBIF, MLNobject)
+
+
+    """
+    # add domains of variables
     addDomain(parsedBIF[0], MLNobject)
 
     # add unary predicates for each variable
@@ -178,7 +250,9 @@ def main():
     addVarConstraints(parsedBIF[0], MLNobject)
 
     # add disjunction clauses for CPT entries
-    addCPTconstraints(parsedBIF, MLNobject)
+    addCPTConstraints(parsedBIF, MLNobject)
+
+    """
 
     # write MLN file
     writeMLN(MLNobject)
