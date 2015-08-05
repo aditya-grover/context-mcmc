@@ -606,7 +606,7 @@ numSamples := 500000;;
 
 Print("Running the orbital Markov chain for ", numSamples, " iterations... please be patient...\n");;
 
-out_file :=OutputTextFile("kl_results.txt",false);;
+out_file :=OutputTextFile("kl_results_withcontext.csv",false);;
 
 ### start to load the block structure of the blocked  sampler ###
 blocks := [];;
@@ -641,7 +641,7 @@ od;;
 #for counter in [1..numSamples] do
 timeArr := [];;
 klArr :=[];;
-maxIterations := 10;;
+maxIterations := 1000;;
 sizeArr := numSamples/10000;
 for iter in [1..sizeArr] do
 	timeArr[iter] := 0;;

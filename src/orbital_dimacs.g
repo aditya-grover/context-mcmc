@@ -11,7 +11,7 @@ end;;
 
 # the correct marginals for evaluation purposes
 # this is very problem dependent (here social network MLN)
-Read("marginals_smokers_e10.g");
+Read("marginals.g");;
 
 # computes the KL divergence between two sets of marginals
 # smoothing constant is 0.000000001
@@ -404,6 +404,7 @@ readSymTime := runtimeSum();;
 # saucy has to be located in the directory of this file
 Print("Symmetry detection with saucy...");;
 Exec( "./saucy -w dimacs.cnf.saucy | sed '$s/,$//' > sym.tmp" );;
+
 # read the Saucy-generated file with the group generators
 inputg := InputTextFile("sym.tmp");;
 symStr := ReadAll(inputg);;
@@ -412,13 +413,21 @@ symStr := ReadAll(inputg);;
 PrintTo("sym.g", "g := Group(", symStr, ");;");;
 # read and interpret this GAP file (so as to load the group)
 # g is then the permutation group
-Read("sym.g");
 
-#Print("Group size: ",Size(g), "\n");;
-orbs := OrbitsDomain(g, [1..sizeOfElements]);;
+if symStr = fail then
+	Print("No Generators found...");;
+	orbs:=[[1],[2],[3],[4],[5],[6],[7],[8],[9]];;
+else
+	Read("sym.g");;
+	orbs := OrbitsDomain(g, [1..sizeOfElements]);;
+fi;;
+
+Print(g);;
+Print("Group size: ",Size(g), "\n");;
 numOfOrbits := Length(orbs);;
-#Print(orbs,"\n");;
-
+Print(orbs,"\n");;
+#g:=[[(1)],[(2)],[(3)],[(4)],[(5)],[(6)],[(7)],[(8)],[(9)]];;
+#orbs:=[[1],[2],[3],[4],[5],[6],[7],[8],[9]];;
 Print("done! (", Float((runtimeSum()-readSymTime)/1000.0), " seconds) \n");;
 Print("Number of variable orbits: ",numOfOrbits,"\n");;
 
@@ -426,7 +435,9 @@ Print("Number of variable orbits: ",numOfOrbits,"\n");;
 prodReplTime := runtimeSum();;
 Print("Initializing the product replacement algorithm...");;
 prpl := ProductReplacer(g);;
-Next(prpl);;
+Print(Next(prpl));
+Print(Next(prpl));;
+
 Print("done! (", Float((runtimeSum()-prodReplTime)/1000.0), " seconds) \n");;
 
 # load the random source
@@ -460,19 +471,16 @@ SubtractSet(variablesToSampleFrom, negativeEvidence);;
 numOfNonEvidenceVariables := Length(variablesToSampleFrom);;
 
 # the list storing the marginals
-marginals := [];;
-for i in [1..sizeOfElements] do
-	Add(marginals, 0);;
-od;;
 
 # the number of samples we want to draw
-numSamples := 5000000;;
+numSamples := 500000;;
 
-sampleTimer := runtimeSum();;
+
 
 Print("Running the orbital Markov chain for ", numSamples, " iterations... please be patient...\n");;
 
-### start to load the block structure of the blocked Gibbs sampler ###
+out_file :=OutputTextFile("kl_results_nocontext.csv",false);;
+### start to load the block structure of the blocked  sampler ###
 blocks := [];;
 for i in variablesToSampleFrom do
 	Add(blocks, [i]);;
@@ -498,89 +506,114 @@ od;;
 #ProfileOperationsAndMethods( true );
 
 # counts the actual number of samples (discarding burn-in etc.)
-sampleCounter := 0;;
-
-# we now iterate over the number of samples we want to generate
-#for counter in [1..numSamples] do
-while sampleCounter < numSamples do
-
+timeArr := [];;
+klArr :=[];;
+maxIterations := 1000;;
+sizeArr := numSamples/10000;
+for iter in [1..sizeArr] do
+	timeArr[iter] := 0;;
+	klArr[iter] := 0;;
+od;;
+for iter in [1..maxIterations] do
 	
-	# sample one of the block IDs uniformly at random
-	bNr := Random(rs1, 1, numOfBlocks);;
-	# based on the block ID get the correpsonding block
-	b := LookupDictionary(blockTable, bNr);;
-
-	dfList := [];;
-	wfList := [];;
-
-	# distinguish blocksize = 1 and blocksize > 1 -> more efficient
-	blockSize := Length(b);;
-	if blockSize > 1 then
-
-		# get the set of features that contain variables in block b (from the hash table)
-		for v in b do
-
-			tmpL := LookupDictionary(deterministicFeaturesTable, v);;
-			if tmpL <> fail then
-				UniteSet(dfList, tmpL);;
-			fi;;
-
-			tmpL := LookupDictionary(weightedFeaturesTable, v);;
-			if tmpL <> fail then
-				UniteSet(wfList, tmpL);;
-			fi;;
-
-			# remove the variables in the block from the current state
-			RemoveSet(s, v);;
-		od;;
-	else
-		tmpL := LookupDictionary(deterministicFeaturesTable, b[1]);;
-		if tmpL <> fail then
-			dfList := tmpL;;
-		fi;;
-
-		tmpL := LookupDictionary(weightedFeaturesTable, b[1]);;
-		if tmpL <> fail then
-			wfList := tmpL;;
-		fi;;
-		
-		# remove the variable in the block from the current state
-		RemoveSet(s, b[1]);;
-	fi;;
-		
-	# compute the next gibbs sampling step
-	toAdd := marginalDistr(b, dfList, wfList, s, rs1);;
-
-	# add the flipped variables to the current set
-	for c in toAdd do
-		#s := UnionSet(s, toAdd);;
-		AddSet(s, c);;
+	sampleCounter := 0;;
+	sampleTimer := runtimeSum();;
+	marginals := [];;
+	for i in [1..sizeOfElements] do
+		Add(marginals, 0);;
 	od;;
 
-	# sample uniformly at random from the orbit of s (= orbital Markov chain)
-	s := OnSets(s, Next(prpl));;	
+	# we now iterate over the number of samples we want to generate
+	#for counter in [1..numSamples] do
+	while sampleCounter < numSamples do
 
-	# update the counts of the variables
-	updatem(marginals, s);;
+		
+		# sample one of the block IDs uniformly at random
+		bNr := Random(rs1, 1, numOfBlocks);;
+		# based on the block ID get the correpsonding block
+		b := LookupDictionary(blockTable, bNr);;
 
-	# increment the sample counter
-	sampleCounter := sampleCounter + 1;;
+		dfList := [];;
+		wfList := [];;
 
-	# print something every 10000 samples
-	if RemInt(sampleCounter, 10000) = 0 then
-		# evaluation -- can be removed in general
-		tmpMargs := [];;
-		for i in [1..sizeOfElements] do
-			tmpMargs[i] := Float(marginals[i]) / Float(sampleCounter);;
+		# distinguish blocksize = 1 and blocksize > 1 -> more efficient
+		blockSize := Length(b);;
+		if blockSize > 1 then
+
+			# get the set of features that contain variables in block b (from the hash table)
+			for v in b do
+
+				tmpL := LookupDictionary(deterministicFeaturesTable, v);;
+				if tmpL <> fail then
+					UniteSet(dfList, tmpL);;
+				fi;;
+
+				tmpL := LookupDictionary(weightedFeaturesTable, v);;
+				if tmpL <> fail then
+					UniteSet(wfList, tmpL);;
+				fi;;
+
+				# remove the variables in the block from the current state
+				RemoveSet(s, v);;
+			od;;
+		else
+			tmpL := LookupDictionary(deterministicFeaturesTable, b[1]);;
+			if tmpL <> fail then
+				dfList := tmpL;;
+			fi;;
+
+			tmpL := LookupDictionary(weightedFeaturesTable, b[1]);;
+			if tmpL <> fail then
+				wfList := tmpL;;
+			fi;;
+			
+			# remove the variable in the block from the current state
+			RemoveSet(s, b[1]);;
+		fi;;
+			
+		# compute the next gibbs sampling step
+		toAdd := marginalDistr(b, dfList, wfList, s, rs1);;
+
+		# add the flipped variables to the current set
+		for c in toAdd do
+			#s := UnionSet(s, toAdd);;
+			AddSet(s, c);;
 		od;;
 
-		kl := kullback(tmpMargs, correctMargs, 3, numOfNonEvidenceVariables);;
-		Print((runtimeSum()-sampleTimer)/1000.0+buildHashTime, " ", kl, " ", sampleCounter, "\n");;
-		#if kl < 0.0001 then 
-		#	break;;
-		#fi;;
-	fi;;
+		# sample uniformly at random from the orbit of s (= orbital Markov chain)
+		s := OnSets(s, Next(prpl));;	
+
+		# update the counts of the variables
+		updatem(marginals, s);;
+
+		# increment the sample counter
+		sampleCounter := sampleCounter + 1;;
+
+		# print something every 10000 samples
+		if RemInt(sampleCounter, 10000) = 0 then
+			# evaluation -- can be removed in general
+			tmpMargs := [];;
+			for i in [1..sizeOfElements] do
+				tmpMargs[i] := Float(marginals[i]) / Float(sampleCounter);;
+			od;;
+
+			kl := kullback(tmpMargs, correctMargs, 3, numOfNonEvidenceVariables);;
+			timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000] + (runtimeSum()-sampleTimer)/1000.0 + buildHashTime ;;
+			klArr[sampleCounter/10000] := klArr[sampleCounter/10000] + kl ;;
+			#Print((runtimeSum()-sampleTimer)/1000.0+buildHashTime, " ", kl, " ", sampleCounter, "\n");;
+			#if kl < 0.0001 then 
+			#	break;;
+			#fi;;
+			if iter = maxIterations then
+					timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000]/maxIterations;;
+					klArr[sampleCounter/10000] := klArr[sampleCounter/10000]/maxIterations;;
+					Print(timeArr[sampleCounter/10000],",",klArr[sampleCounter/10000],",",sampleCounter,"\n");;
+					AppendTo(out_file,String(timeArr[sampleCounter/10000]),",",String(klArr[sampleCounter/10000]),",",String(sampleCounter),"\n");;
+			fi;;
+		fi;;
+	od;;
 od;;
+CloseStream(out_file);;
 
 	# evaluation -- can be removed in general
 	#for i in [1..sizeOfElements] do
@@ -594,4 +627,5 @@ od;;
 
 	#ProfileGlobalFunctions( false );
 	#ProfileOperationsAndMethods( false );
-	#DisplayProfile();
+	#DisplayProfile();:Q!
+
