@@ -426,8 +426,7 @@ Print(g);;
 Print("Group size: ",Size(g), "\n");;
 numOfOrbits := Length(orbs);;
 Print(orbs,"\n");;
-#g:=[[(1)],[(2)],[(3)],[(4)],[(5)],[(6)],[(7)],[(8)],[(9)]];;
-#orbs:=[[1],[2],[3],[4],[5],[6],[7],[8],[9]];;
+
 Print("done! (", Float((runtimeSum()-readSymTime)/1000.0), " seconds) \n");;
 Print("Number of variable orbits: ",numOfOrbits,"\n");;
 
@@ -473,7 +472,7 @@ numOfNonEvidenceVariables := Length(variablesToSampleFrom);;
 # the list storing the marginals
 
 # the number of samples we want to draw
-numSamples := 500000;;
+numSamples := 1000000;;
 
 
 
@@ -508,13 +507,14 @@ od;;
 # counts the actual number of samples (discarding burn-in etc.)
 timeArr := [];;
 klArr :=[];;
-maxIterations := 1000;;
+kl_vals := [];;
+maxIterations := 1;;
 sizeArr := numSamples/10000;
 for iter in [1..sizeArr] do
 	timeArr[iter] := 0;;
 	klArr[iter] := 0;;
 od;;
-for iter in [1..maxIterations] do
+for iter in [0..maxIterations-1] do
 	
 	sampleCounter := 0;;
 	sampleTimer := runtimeSum();;
@@ -522,6 +522,7 @@ for iter in [1..maxIterations] do
 	for i in [1..sizeOfElements] do
 		Add(marginals, 0);;
 	od;;
+	#rs1 := RandomSource(IsMersenneTwister);;
 
 	# we now iterate over the number of samples we want to generate
 	#for counter in [1..numSamples] do
@@ -530,6 +531,7 @@ for iter in [1..maxIterations] do
 		
 		# sample one of the block IDs uniformly at random
 		bNr := Random(rs1, 1, numOfBlocks);;
+		
 		# based on the block ID get the correpsonding block
 		b := LookupDictionary(blockTable, bNr);;
 
@@ -581,8 +583,9 @@ for iter in [1..maxIterations] do
 		od;;
 
 		# sample uniformly at random from the orbit of s (= orbital Markov chain)
+		
 		s := OnSets(s, Next(prpl));;	
-
+	
 		# update the counts of the variables
 		updatem(marginals, s);;
 
@@ -600,20 +603,35 @@ for iter in [1..maxIterations] do
 			kl := kullback(tmpMargs, correctMargs, 3, numOfNonEvidenceVariables);;
 			timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000] + (runtimeSum()-sampleTimer)/1000.0 + buildHashTime ;;
 			klArr[sampleCounter/10000] := klArr[sampleCounter/10000] + kl ;;
+			kl_vals[iter*sizeArr+sampleCounter/10000] := kl;;
 			#Print((runtimeSum()-sampleTimer)/1000.0+buildHashTime, " ", kl, " ", sampleCounter, "\n");;
 			#if kl < 0.0001 then 
 			#	break;;
 			#fi;;
-			if iter = maxIterations then
+			if iter = maxIterations-1 then
 					timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000]/maxIterations;;
 					klArr[sampleCounter/10000] := klArr[sampleCounter/10000]/maxIterations;;
 					Print(timeArr[sampleCounter/10000],",",klArr[sampleCounter/10000],",",sampleCounter,"\n");;
-					AppendTo(out_file,String(timeArr[sampleCounter/10000]),",",String(klArr[sampleCounter/10000]),",",String(sampleCounter),"\n");;
+					variance := 0;;
+					for x in [0..maxIterations-1] do
+						#Print("InLoop",x*sizeArr+sampleCounter/10000);;
+						variance :=  variance +(kl_vals[x*sizeArr+sampleCounter/10000]-klArr[sampleCounter/10000])*(kl_vals[x*sizeArr+sampleCounter/10000]-klArr[sampleCounter/10000]);;
+					od;;
+					standard_error := 2*Sqrt(variance)/maxIterations;;
+					AppendTo(out_file,String(timeArr[sampleCounter/10000]),",",String(klArr[sampleCounter/10000]),",",String(sampleCounter),",",standard_error,"\n");;
+
+
 			fi;;
 		fi;;
 	od;;
+
 od;;
 CloseStream(out_file);;
+
+	# for i in [1..sizeOfElements] do
+	# 	Print("Temp Marginals",tmpMargs[i],"\n");;
+	# od;;
+
 
 	# evaluation -- can be removed in general
 	#for i in [1..sizeOfElements] do

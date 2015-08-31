@@ -30,6 +30,9 @@ end;;
 
 ##########################################################################################################################################
 
+
+
+
 # the correct marginals for evaluation purposes
 # this is very problem dependent (here social network MLN)
 Read("marginals.g");;
@@ -112,7 +115,6 @@ updatem := function(m, s)
 		m[i] := m[i] + 1;;
 	od;;
 end;;
-
 # takes a set of deterministic formulas 
 # returns true if the current world is a satisfing assignment
 # return false otherwise
@@ -459,7 +461,7 @@ else
 	orbs := OrbitsDomain(g, [1..sizeOfElements]);;
 fi;;
 
-Print(g);;
+#Print(g);;
 Print("Group size: ",Size(g), "\n");;
 numOfOrbits := Length(orbs);;
 Print(orbs,"\n");;
@@ -467,100 +469,172 @@ Print("done! (", Float((runtimeSum()-readSymTime)/1000.0), " seconds) \n");;
 Print("Number of variable orbits: ",numOfOrbits,"\n");;
 gOriginal :=g;;
 
+# for v in [1..Length(VariableMappings)] do
+# 	for truth_vals in [1..2] do
+# 		if truth_vals=2 then
+# 			v := -v;
+# 		fi;;
+# 		context_vars_list := [];;
+
 ####################################### Generating contextual Dimac.cnf.saucy ##############################
-Print("Reading the DIMACs Saucy CNF input file...\n");;
-input_saucy := InputTextFile("dimacs.cnf.saucy");;
-contextual_saucy :=OutputTextFile("dimacs_context_temp.cnf.saucy",false);;
-Saucy_String := ReadAll(input_saucy);;
-context := [rec(var_name := "A0(A0_VAL)",var_value := true)];;
-#context := [rec(var_name :="friends(P1,P2)",var_value :=true),rec(var_name :="cancer(P1)", var_value :=false)];; #get_context;
-context_vars :=NewDictionary(1,true,true);;
-context_vars_list := [];;
-for i in [1..Length(context)] do
-	temp_var :=Int(LookupDictionary(VariableMappings,context[i].var_name));;
-	if context[i].var_value = false then
-		context_vars_list:=Concatenation(context_vars_list,[-1*temp_var]);;
-	else
-		context_vars_list:=Concatenation(context_vars_list,[temp_var]);;
-	fi;;
-od;;
-saucy_lines := SplitString(Saucy_String,"\n");;
-AppendTo( contextual_saucy, saucy_lines[1],"\n");;
-old_original_color := 1;;
-color := 1;;
-clauses :=0;;
-flag := false;;
-for i in [2..Length(saucy_lines)]do
-	flag := false;;
-	curr_clause :=SplitString(saucy_lines[i]," ");;
-	# if original_color <> Int(curr_clause[1]) then
-	# 	flag := true;;
-	# 	original_color := original_color + 1;;
-	# 	color := color + 1;;
-	# fi;;
-	omit_line :=false;;
-	for j in [2..Length(curr_clause)-1]do
-		l:=Length(curr_clause[j]);;
-		if Int(curr_clause[j]) in context_vars_list then
-			omit_line := true;;
-			# if flag = true then
-			# 	color := color-1;;
-			# fi;;
+gBestContext :=gOriginal;;
+best_var :=0;;
+context_vars_list :=[];;
+maxContextSize := 1;; # Maximum it can be sizeOfElements
+
+for context_size in [1..maxContextSize] do
+	gIterBest := gBestContext;;
+	for curr_var_context in [1..sizeOfElements] do
+		
+		if curr_var_context =100 then
 			break;;
 		fi;;
-	od;;
-	if omit_line=false then
-		if old_original_color <> Int(curr_clause[1]) then
-			color := color + 1;;
-			old_original_color := Int(curr_clause[1]);;
+
+		 # Evidence Variables should not be used as Context
+		if curr_var_context in positiveEvidence or curr_var_context in negativeEvidence then 
+			continue ;;
 		fi;;
-		new_clause := Concatenation(String(color), " ", JoinStringsWithSeparator(curr_clause{[2..Length(curr_clause)]}, " "));;
-		AppendTo(contextual_saucy,new_clause,"\n");
-		clauses := clauses + 1;;
-	fi;;
+
+		#Variables already in Context should not be used for further context
+		flag_break :=false;;
+		for i in [1..Length(context_vars_list)] do
+			if AbsInt(context_vars_list[i]) = curr_var_context then
+				flag_break :=true;;
+			fi;;	 
+		od;;
+
+		if flag_break then
+			continue;;
+		fi;;
+
+		
+		
+		for var_value in [true,false] do 
+
+			
+			#Print("Reading the DIMACs Saucy CNF input file...\n");;
+			input_saucy := InputTextFile("dimacs.cnf.saucy");;
+			contextual_saucy :=OutputTextFile("dimacs_context_temp.cnf.saucy",false);;
+			
+			
+			Saucy_String := ReadAll(input_saucy);;
+			
+			if context_size=1 then
+				temp_context_vars_list := [];;
+			fi;;
+				temp_context_vars_list := context_vars_list;;
+
+			gContext :=[];;
+			
+			if var_value=false then
+				temp_context_vars_list:=Concatenation(temp_context_vars_list,[-1*curr_var_context]);;
+			else
+				temp_context_vars_list:=Concatenation(temp_context_vars_list,[curr_var_context]);;
+			fi;;
+			#od;;
+			saucy_lines := SplitString(Saucy_String,"\n");;
+			AppendTo(contextual_saucy, saucy_lines[1],"\n");;
+			old_original_color := 1;;
+			color := 1;;
+			clauses :=0;;
+			flag := false;;
+			for i in [2..Length(saucy_lines)]do
+				flag := false;;
+				curr_clause :=SplitString(saucy_lines[i]," ");;
+				# if original_color <> Int(curr_clause[1]) then
+				# 	flag := true;;
+				# 	original_color := original_color + 1;;
+				# 	color := color + 1;;
+				# fi;;
+				omit_line :=false;;
+				for j in [2..Length(curr_clause)-1]do
+					l:=Length(curr_clause[j]);;
+					if Int(curr_clause[j]) in temp_context_vars_list then
+						omit_line := true;;
+						# if flag = true then
+						# 	color := color-1;;
+						# fi;;
+						break;;
+					fi;;
+				od;;
+				if omit_line=false then
+					if old_original_color <> Int(curr_clause[1]) then
+						color := color + 1;;
+						old_original_color := Int(curr_clause[1]);;
+					fi;;
+					new_clause := Concatenation(String(color), " ", JoinStringsWithSeparator(curr_clause{[2..Length(curr_clause)]}, " "));;
+					AppendTo(contextual_saucy,new_clause,"\n");
+					clauses := clauses + 1;;
+				fi;;
+			od;;
+
+			CloseStream(contextual_saucy);;
+			CloseStream(input_saucy);;
+			num_clauses :=clauses;;
+			input_saucy := InputTextFile("dimacs_context_temp.cnf.saucy");;
+			contextual_saucy :=OutputTextFile("dimacs_context.cnf.saucy",false);;
+			Saucy_String := ReadAll(input_saucy);;
+			saucy_lines := SplitString(Saucy_String,"\n");;
+			first_line :=SplitString(saucy_lines[1]," ");;
+			new_num_vars :=Int(first_line[3]);;#-Length(context_vars_list);; //removeLater
+			new_str:=Concatenation(first_line[1]," ",first_line[2]," ",String(new_num_vars)," ",String(clauses),"\n");;
+			AppendTo(contextual_saucy,new_str);;
+			for i in [2..Length(saucy_lines)] do
+				AppendTo(contextual_saucy,saucy_lines[i],"\n");;
+			od;;
+			CloseStream(contextual_saucy);;
+			CloseStream(input_saucy);;
+
+			symStr := runSaucy("dimacs_context.cnf.saucy", new_num_vars);;
+			if symStr = fail then
+				#Print("No Generators found...",curr_var_context);;
+				orbs:=[[1],[2],[3],[4],[5],[6],[7],[8],[9]];;
+				gContext[curr_var_context] := gOriginal;;
+			else
+				Read("sym.g");;
+				gContext[curr_var_context] := g;;
+				orbs := OrbitsDomain(gContext[curr_var_context], [1..sizeOfElements]);;
+				#Print(g);;
+			    Print("Group size: ",Size(g), "\n");;
+			fi;;
+
+			
+			
+			numOfOrbits := Length(orbs);;
+																																																																																																								
+			if Size(gIterBest) <= Size(gContext[curr_var_context]) then
+				gIterBest := gContext[curr_var_context];;
+				if var_value=false then
+					best_var := -1*curr_var_context;;
+				else
+					best_var := curr_var_context;;
+				fi;;
+			fi;;
+		od;;
+		Print("Iteration",curr_var_context,"\n");
+	od;;
+	
+	
+	gBestContext := Union(gBestContext,gIterBest);;
+	
+	
+	#gBestContext := gIterBest ;;#Union(gBestContext,gIterBest);;
+	Print("Best var is ",best_var," having group size",Size(gBestContext),"\n");;
+	
+	#context_vars_list := [];;
+	context_vars_list:=Concatenation(context_vars_list,[best_var]);;
 od;;
 
-CloseStream(contextual_saucy);;
-CloseStream(input_saucy);;
-num_clauses :=clauses;;
-input_saucy := InputTextFile("dimacs_context_temp.cnf.saucy");;
-contextual_saucy :=OutputTextFile("dimacs_context.cnf.saucy",false);;
-Saucy_String := ReadAll(input_saucy);;
-saucy_lines := SplitString(Saucy_String,"\n");;
-first_line :=SplitString(saucy_lines[1]," ");;
-new_num_vars :=Int(first_line[3]);;#-Length(context_vars_list);; //removeLater
-new_str:=Concatenation(first_line[1]," ",first_line[2]," ",String(new_num_vars)," ",String(clauses),"\n");;
-AppendTo(contextual_saucy,new_str);;
-for i in [2..Length(saucy_lines)] do
-	AppendTo(contextual_saucy,saucy_lines[i],"\n");;
-od;;
-CloseStream(contextual_saucy);;
-CloseStream(input_saucy);;
-
-symStr := runSaucy("dimacs_context.cnf.saucy", new_num_vars);;
-if symStr = fail then
-	Print("No Generators found...");;
-	orbs:=[[1],[2],[3],[4],[5],[6],[7],[8],[9]];;
-else
-	Read("sym.g");;
-	gContext :=g;
-	orbs := OrbitsDomain(g, [1..sizeOfElements]);;
-fi;;
-
-
-Print(g);;
-Print("Group size: ",Size(g), "\n");;
-numOfOrbits := Length(orbs);;
-Print(orbs,"\n");;
-Print("done! (", Float((runtimeSum()-readSymTime)/1000.0), " seconds) \n");;
-Print("Number of variable orbits: ",numOfOrbits,"\n");;																																																																																																								
+#Print("context_vars_list",context_vars_list[1],context_vars_list[2]);;
 
 ###############################################################################################################
 # loads the product replacement algorithm
 prodReplTime := runtimeSum();;
+#gBestContext := Group((8, 4),(4, 12));;
+#gOriginal := Group((8, 4),(4, 12));;
 Print("Initializing the product replacement algorithm...");;
 prplOriginal := ProductReplacer(gOriginal);;
-prplContext := ProductReplacer(gContext);;
+prplContext := ProductReplacer(gBestContext);;
 Print(Next(prplOriginal));
 Print(Next(prplContext));
 
@@ -600,7 +674,7 @@ numOfNonEvidenceVariables := Length(variablesToSampleFrom);;
 
 
 # the number of samples we want to draw
-numSamples := 500000;;
+numSamples := 1000000;;
 
 
 
@@ -641,13 +715,14 @@ od;;
 #for counter in [1..numSamples] do
 timeArr := [];;
 klArr :=[];;
-maxIterations := 1000;;
+kl_vals := [];;
+maxIterations := 1;;
 sizeArr := numSamples/10000;
 for iter in [1..sizeArr] do
 	timeArr[iter] := 0;;
 	klArr[iter] := 0;;
 od;;
-for iter in [1..maxIterations] do
+for iter in [0..maxIterations-1] do
 	
 	sampleCounter := 0;;
 	sampleTimer := runtimeSum();;
@@ -656,11 +731,13 @@ for iter in [1..maxIterations] do
 		Add(marginals, 0);;
 	od;;
 
+	
 	while sampleCounter < numSamples do
-
+		
 		
 		# sample one of the block IDs uniformly at random
 		bNr := Random(rs1, 1, numOfBlocks);;
+		
 		# based on the block ID get the correpsonding block
 		b := LookupDictionary(blockTable, bNr);;
 
@@ -702,7 +779,7 @@ for iter in [1..maxIterations] do
 			# remove the variable in the block from the current state
 			RemoveSet(s, b[1]);;
 		fi;;
-			
+
 		# compute the next gibbs sampling step
 		toAdd := marginalDistr(b, dfList, wfList, s, rs1);;
 
@@ -714,30 +791,41 @@ for iter in [1..maxIterations] do
 
 		# sample uniformly at random from the orbit of s (= orbital Markov chain)
 		
-		# Print("s:", s, "\n");
+		#Print("s:", s, "\n");
 
 		# TODO: currently assuming context_vars_list contains only one 
 		context_valid := false;;
+		
 		for i in [1..Length(context_vars_list)] do
 			if context_vars_list[i] > 0 then
 				if context_vars_list[i] in s then
 					context_valid := true;;
 				fi;;
-			else 
-				if not context_vars_list[i] in s then
+			 else 
+			 	neg_context_var := -1*context_vars_list[i];;
+			 	
+			 	if not neg_context_var in s then
 					context_valid := true;;
-				fi;;
+					
+			 	fi;;
 			fi;;
 		od;;
+	
 
+		#context_valid := false;;
 		if context_valid = false then	
 			s := OnSets(s, Next(prplOriginal));;
+			
 		else
+			olds := s;;
 			s := OnSets(s, Next(prplContext));;
+			
+			
 		fi;;	
 
 		# update the counts of the variables
 		updatem(marginals, s);;
+
 
 		# increment the sample counter
 		
@@ -750,20 +838,30 @@ for iter in [1..maxIterations] do
 				tmpMargs[i] := Float(marginals[i]) / Float(sampleCounter);;
 			od;;
 
-			kl := kullback(tmpMargs, correctMargs, 3, numOfNonEvidenceVariables);;
+			kl := kullback(tmpMargs,correctMargs, 3, numOfNonEvidenceVariables);;
 			#Print((runtimeSum()-sampleTimer)/1000.0+buildHashTime, " ", kl, " ", sampleCounter, "\n");;
 			timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000] + (runtimeSum()-sampleTimer)/1000.0 + buildHashTime ;;
 			klArr[sampleCounter/10000] := klArr[sampleCounter/10000] + kl ;;
-			
+			kl_vals[iter*sizeArr+sampleCounter/10000] := kl;;
+			#Print("Values",iter*sizeArr+sampleCounter/10000,"\n");;
+
+
 			#if kl < 0.0001 then 
 			#	break;;
 			#fi;;
 			
-			if iter = maxIterations then
+			if iter = maxIterations-1 then
 				timeArr[sampleCounter/10000] := timeArr[sampleCounter/10000]/maxIterations;;
 				klArr[sampleCounter/10000] := klArr[sampleCounter/10000]/maxIterations;;
 				Print(timeArr[sampleCounter/10000],",",klArr[sampleCounter/10000],",",sampleCounter,"\n");;
-				AppendTo(out_file,String(timeArr[sampleCounter/10000]),",",String(klArr[sampleCounter/10000]),",",String(sampleCounter),"\n");;
+				variance := 0;;
+
+				for x in [0..maxIterations-1] do
+					
+					variance :=  variance +(kl_vals[x*sizeArr+sampleCounter/10000]-klArr[sampleCounter/10000])*(kl_vals[x*sizeArr+sampleCounter/10000]-klArr[sampleCounter/10000]);;
+				od;;
+				standard_error := 2*Sqrt(variance)/maxIterations;;
+				AppendTo(out_file,String(timeArr[sampleCounter/10000]),",",String(klArr[sampleCounter/10000]),",",String(sampleCounter),",",standard_error,"\n");;
 			fi;;		
 		fi;;
 
@@ -771,7 +869,9 @@ for iter in [1..maxIterations] do
 od;;
 CloseStream(out_file);;
 
-
+	for i in [1..sizeOfElements] do
+		Print("Temp Marginals",tmpMargs[i],"\n");;
+	od;;
 
 
 	# evaluation -- can be removed in general
